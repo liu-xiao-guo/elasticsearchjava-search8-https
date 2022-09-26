@@ -116,6 +116,44 @@ public class ElasticsearchJava {
         asyncClient = new ElasticsearchAsyncClient(transport);
     }
 
+    private static synchronized void makeConnection_truststore() throws CertificateException, IOException, NoSuchAlgorithmException,
+            KeyStoreException, KeyManagementException {
+        final CredentialsProvider credentialsProvider =
+                new BasicCredentialsProvider();
+        credentialsProvider.setCredentials(AuthScope.ANY,
+                new UsernamePasswordCredentials("elastic", "Qu9UByppvqRRyI0LkoI+"));
+
+        String storePath = "/Users/liuxg/elastic/elasticsearch-8.4.1/config/certs/truststore.p12";
+//        String keyStorePass = "dI8wbt8VTkigRjxvOrvP9w";
+        String keyStorePass = "password";
+        Path trustStorePath = Paths.get(storePath);
+        KeyStore truststore = KeyStore.getInstance("pkcs12");
+        try (InputStream is = Files.newInputStream(trustStorePath)) {
+            truststore.load(is, keyStorePass.toCharArray());
+        }
+        SSLContextBuilder sslBuilder = SSLContexts.custom()
+                .loadTrustMaterial(truststore, null);
+        final SSLContext sslContext = sslBuilder.build();
+        RestClientBuilder builder = RestClient.builder(
+                        new HttpHost("localhost", 9200, "https"))
+                .setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback() {
+                    @Override
+                    public HttpAsyncClientBuilder customizeHttpClient(
+                            HttpAsyncClientBuilder httpClientBuilder) {
+                        return httpClientBuilder.setSSLContext(sslContext)
+                                .setDefaultCredentialsProvider(credentialsProvider);
+                    }
+                });
+        RestClient restClient = builder.build();
+
+        // Create the transport with a Jackson mapper
+        ElasticsearchTransport transport = new RestClientTransport(
+                restClient, new JacksonJsonpMapper());
+
+        client = new ElasticsearchClient(transport);
+        asyncClient = new ElasticsearchAsyncClient(transport);
+    }
+
     private static synchronized void makeConnection_token() throws CertificateException, IOException, NoSuchAlgorithmException,
             KeyStoreException, KeyManagementException {
         Path caCertificatePath = Paths.get("/Users/liuxg/test/elasticsearch-8.1.2/config/certs/http_ca.crt");
@@ -181,8 +219,20 @@ public class ElasticsearchJava {
 //            e.printStackTrace();
 //        }
 
+//        try {
+//            makeConnection_token();
+//        } catch (CertificateException e) {
+//            e.printStackTrace();
+//        } catch (NoSuchAlgorithmException e) {
+//            e.printStackTrace();
+//        } catch (KeyStoreException e) {
+//            e.printStackTrace();
+//        } catch (KeyManagementException e) {
+//            e.printStackTrace();
+//        }
+
         try {
-            makeConnection_token();
+            makeConnection_truststore();
         } catch (CertificateException e) {
             e.printStackTrace();
         } catch (NoSuchAlgorithmException e) {
